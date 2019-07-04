@@ -1,3 +1,5 @@
+cd $(dirname $0) && pwd
+
 echo "gopl.io"
 go run main.go http://gopl.io
 

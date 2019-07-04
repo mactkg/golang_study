@@ -1,3 +1,5 @@
+cd $(dirname $0) && pwd
+
 buffer="n,times,type.time,nsop,byte,allock, "
 for N in 1 10 100 1000 10000; do
     DATA=`cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 10 | head -n $N | tr '\n' ' ' | sort | uniq`

@@ -1,3 +1,5 @@
+cd $(dirname $0) && pwd
+
 echo "https://httpbin.org/status/200"
 go run main.go https://httpbin.org/status/200
 
