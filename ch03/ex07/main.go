@@ -38,9 +38,9 @@ func mandelbrot(z complex128) color.Color {
 	var v = z
 	for n := uint8(0); n < iterations; n++ {
 		v = v - (v-1/(v*v*v))/4
-		if cmplx.Abs(v*v*v*v-1) < 1e-5 { // out of "circle"
+		if cmplx.Abs(v*v*v*v-1) < 1e-5 {
 			return color.Gray{255 - contrast*n}
 		}
 	}
-	return color.Black // you are in mandelbrot!
+	return color.Black
 }
