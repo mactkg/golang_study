@@ -14,26 +14,36 @@ func TestPopCounts(t *testing.T) {
 	}
 }
 
+var res int
+
 func BenchmarkPopCountSingle(b *testing.B) {
+	temp := 0
 	for i := 0; i < b.N; i++ {
-		popcount.PopCountSingle(10)
+		temp += popcount.PopCountSingle(10 * uint64(i))
 	}
+	res = temp
 }
 
 func BenchmarkPopCountLoop(b *testing.B) {
+	temp := 0
 	for i := 0; i < b.N; i++ {
-		popcount.PopCountLoop(10)
+		temp += popcount.PopCountLoop(10 * uint64(i))
 	}
+	res = temp
 }
 
 func BenchmarkPopCountLoopShift(b *testing.B) {
+	temp := 0
 	for i := 0; i < b.N; i++ {
-		popcount.PopCountLoopShift(10)
+		temp += popcount.PopCountLoopShift(10 * uint64(i))
 	}
+	res = temp
 }
 
 func BenchmarkPopCountLoopWithOutShift(b *testing.B) {
+	temp := 0
 	for i := 0; i < b.N; i++ {
-		popcount.PopCountLoopWithOutShift(10)
+		temp += popcount.PopCountLoopWithOutShift(10 * uint64(i))
 	}
+	res = temp
 }
