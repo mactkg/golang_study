@@ -12,7 +12,7 @@ var option = renderOption{
 	ymin:       -2,
 	xmax:       +2,
 	ymax:       +2,
-	iterations: 20,
+	iterations: 5,
 	contrast:   20,
 }
 var img = image.NewRGBA(image.Rect(0, 0, int(option.width*2), int(option.height*2)))
