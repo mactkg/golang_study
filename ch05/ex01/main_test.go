@@ -18,6 +18,7 @@ const data = `
 			<p><a href="http://golang.org/">Golang Offical Web Page</a></p>
 		</div>
 	</div>
+	<footer><a href="https://contact.me/golang">contact</a></footer>
 </body>
 </html>
 `
@@ -39,11 +40,13 @@ func Test(t *testing.T) {
 			check |= 2
 		case "http://golang.org/":
 			check |= 4
+		case "https://contact.me/golang":
+			check |= 8
 		default:
 			t.Fatal("Found unexpected link", res)
 		}
 	}
-	if check != 7 {
+	if check != 15 {
 		t.Fatal("Some links aren't found", results)
 	}
 }
