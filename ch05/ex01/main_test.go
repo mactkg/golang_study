@@ -23,7 +23,7 @@ const data = `
 </html>
 `
 
-func Test(t *testing.T) {
+func TestVisit(t *testing.T) {
 	r := strings.NewReader(data)
 	doc, err := html.Parse(r)
 	if err != nil {
