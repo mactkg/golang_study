@@ -2,23 +2,35 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
+	"strconv"
 )
 
 const APIURL = "http://www.omdbapi.com"
 
-type Movie struct {
-	Title  string
-	Poster string
+type Comic struct {
+	Num         int
+	transscript string
+	img         string
 }
 
-func getMovie(title, key string) (movie *Movie, err error) {
-	url := fmt.Sprintf("%s?t=%s&apikey=%s", APIURL, url.QueryEscape(title), key)
+func getJSONPath(id int) string {
+	return "./data/" + strconv.FormatInt(int64(id), 10) + ".json"
+}
+
+func getComic(id int) (comic *Comic, err error) {
+	// checkCache
+	_, err = os.Stat(getJSONPath(id))
+	if err == nil {
+		return load(id)
+	}
+
+	// if can't find, fetch it
+	url := fmt.Sprintf("%s/id/info.0.json", APIURL, id)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -30,43 +42,53 @@ func getMovie(title, key string) (movie *Movie, err error) {
 		return nil, err
 	}
 
-	var result Movie
+	var result Comic
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
+
+	save(&result)
+
 	return &result, nil
 }
 
-func fetchPoster(movie *Movie, key string) (path string, err error) {
-	url := movie.Poster
-	resp, err := http.Get(url + "?apikey=" + key)
+func load(id int) (*Comic, error) {
+	f, err := os.Open(getJSONPath(id))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer resp.Body.Close()
+	defer f.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Error: %d", resp.StatusCode)
-		return "", err
+	var result Comic
+	err = json.NewDecoder(f).Decode(&result)
+	if err != nil {
+		return nil, err
 	}
 
-	file, err := os.Create(movie.Title + filepath.Ext(movie.Poster))
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+	return &result, nil
+}
 
-	writer := bufio.NewWriter(file)
-	_, err = writer.ReadFrom(resp.Body)
+func save(comic *Comic) bool {
+	f, err := os.Create(getJSONPath(comic.Num))
 	if err != nil {
-		return "", err
+		return false
 	}
-	err = writer.Flush()
+	defer f.Close()
+
+	buf := bytes.NewBufferString("")
+	err = json.NewEncoder(buf).Encode(comic)
 	if err != nil {
-		return "", err
+		return false
 	}
-	return "./" + file.Name(), nil
+
+	writer := bufio.NewWriter(f)
+	_, err = writer.ReadFrom(buf)
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 func main() {
