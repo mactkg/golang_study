@@ -41,3 +41,10 @@ func TestVisit(t *testing.T) {
 		}
 	}
 }
+
+func TestVisitWithEmptyString(t *testing.T) {
+	results := Visit(nil, nil)
+	if len(results) != 0 {
+		t.Fatalf("Expected len(results) is 0, but got %d", len(results))
+	}
+}

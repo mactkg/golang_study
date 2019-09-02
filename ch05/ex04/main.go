@@ -20,6 +20,10 @@ func main() {
 }
 
 func Visit(links []string, n *html.Node) []string {
+	if n == nil {
+		return nil
+	}
+
 	if n.Type == html.ElementNode {
 		// pick up valid keys of the node
 		keys := []string{}
