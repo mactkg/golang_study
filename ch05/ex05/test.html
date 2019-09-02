@@ -1,0 +1,35 @@
+<html>
+  <head>
+    <title>Test Page</title>
+    <style>
+      body {
+        background-color: antiquewhite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <h2>Test Page 150x150</h2>
+        <img src="https://via.placeholder.com/150" />
+        Hello world
+      </div>
+      <div class="row">
+        <h2>Test Page</h2>
+      </div>
+      <div>
+        <p>paragraph tag test</p>
+      </div>
+    </div>
+    <!-- Invalid image tag -->
+    <img href="https://via.placeholder.com/150" />
+
+    <script type="application/javascript">
+      const d = document.querySelector(".container");
+      setInterval(() => {
+        d.style.transform = `rotateZ(${(Date.now() / 1000.0) * 365}deg)`;
+      }, 10);
+    </script>
+  </body>
+  Out of body
+</html>
