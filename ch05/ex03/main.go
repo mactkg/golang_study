@@ -21,18 +21,17 @@ func main() {
 func GetTextContent(content []string, n *html.Node) []string {
 	if n.Type == html.TextNode {
 		switch n.Parent.Data {
-		case "html", "body", "script", "style":
-			goto Traverse
-		}
-
-		// triming
-		text := strings.TrimLeft(n.Data, "\t\n")
-		if text != "" {
-			content = append(content)
+		case "script", "style":
+			// skip
+		default:
+			// triming
+			text := strings.Trim(n.Data, "\t\n")
+			if text != "" {
+				content = append(content, text)
+			}
 		}
 	}
 
-Traverse:
 	if n.FirstChild != nil {
 		content = GetTextContent(content, n.FirstChild)
 	}

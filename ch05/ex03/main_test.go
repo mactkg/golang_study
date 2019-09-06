@@ -10,16 +10,18 @@ import (
 
 const data = `
 <html>
+html
 <head>
 	<link rel="stylesheet" href="style.css">
 </head>
 <body>
+	body
 	<h1><a href="/">Test Page</a></h1>
 	<div>
 		<h2><a href="/blogs/1">Post #1</a></h2>
 		<div>
 			<p>Hello, world!</p>
-			<p><a href="http://golang.org/">Golang Offical Web Page</a></p>
+			<p><a href="http://golang.org/">Golang Official Web Page</a></p>
 		</div>
 	</div>
 	<footer><a href="https://contact.me/golang">contact</a></footer>
@@ -39,6 +41,8 @@ func TestGetTextContent(t *testing.T) {
 	}
 
 	expected := []string{
+		"html",
+		"body",
 		"Test Page",
 		"Post #1",
 		"Hello, world!",
@@ -53,7 +57,7 @@ func TestGetTextContent(t *testing.T) {
 
 	for i, v := range res {
 		if v != expected[i] {
-			t.Fatalf("expected %v, but got %v", expected[i], v)
+			t.Fatalf("expected %q, but got %q", expected[i], v)
 		}
 	}
 
