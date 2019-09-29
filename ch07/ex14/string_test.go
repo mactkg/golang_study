@@ -16,6 +16,8 @@ func TestString(t *testing.T) {
 		{"-1 + -x"},
 		{"-1 - x"},
 		{"-0.24 - x"},
+		{"-0.24 - x # 012"},
+		{"# test -1 + 1"},
 	}
 	for _, test := range tests {
 		expr, err := Parse(test.expr)

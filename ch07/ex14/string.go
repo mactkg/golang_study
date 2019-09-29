@@ -30,3 +30,12 @@ func (c call) String() string {
 
 	return fmt.Sprintf("%s(%s)", c.fn, args)
 }
+
+func (c comment) String() string {
+	// return fmt.Sprintln(c.str)
+	return fmt.Sprintf("%s#%s", c.expr, string(c.str))
+}
+
+func (n nop) String() string {
+	return ""
+}

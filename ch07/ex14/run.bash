@@ -1,1 +1,1 @@
-go test -run "^(TestString)$" -v
+go test -v

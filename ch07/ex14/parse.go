@@ -55,6 +55,8 @@ func precedence(op rune) int {
 //        | id '(' expr ',' ... ')'     a function call
 //        | '-' expr                    a unary operator (+-)
 //        | expr '+' expr               a binary operator (+-*/)
+//		  | expr '#' comment			a comment
+//		  | '#' comment					a comment
 //
 func Parse(input string) (_ Expr, err error) {
 	defer func() {
@@ -72,11 +74,43 @@ func Parse(input string) (_ Expr, err error) {
 	lex.scan.Init(strings.NewReader(input))
 	lex.scan.Mode = scanner.ScanIdents | scanner.ScanInts | scanner.ScanFloats
 	lex.next() // initial lookahead
+	// check comment at the first
+	com := parseComment(lex)
+	if com != nil {
+		return com, nil
+	}
+
 	e := parseExpr(lex)
-	if lex.token != scanner.EOF {
+	if lex.token != scanner.EOF && lex.token != '#' {
 		return nil, fmt.Errorf("unexpected %s", lex.describe())
 	}
+
+	// comment at the end
+	com = parseComment(lex)
+	if com != nil {
+		e = comment{com.(comment).str, e}
+	}
 	return e, nil
+}
+
+func parseComment(lex *lexer) Expr {
+	lex.scan.Whitespace = 1
+	defer func() {
+		lex.scan.Whitespace = scanner.GoWhitespace
+	}()
+
+	if lex.token == '#' {
+		lex.next() // consume Comment tag
+		com := ""
+		for {
+			com += lex.text()
+			if lex.token == scanner.EOF {
+				return comment{com, nop{}}
+			}
+			lex.next()
+		}
+	}
+	return nil
 }
 
 func parseExpr(lex *lexer) Expr { return parseBinary(lex, 1) }

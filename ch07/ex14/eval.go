@@ -67,4 +67,12 @@ func (c call) Eval(env Env) float64 {
 	panic(fmt.Sprintf("unsupported function call: %s", c.fn))
 }
 
+func (c comment) Eval(env Env) float64 {
+	return c.expr.Eval(env) // nop
+}
+
+func (n nop) Eval(env Env) float64 {
+	return 0
+}
+
 //!-Eval2

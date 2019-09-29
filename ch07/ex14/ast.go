@@ -39,4 +39,13 @@ type call struct {
 	args []Expr
 }
 
+// Comment
+type comment struct {
+	str  string //[]rune
+	expr Expr
+}
+
+// Nop for comment
+type nop struct{}
+
 //!-ast
