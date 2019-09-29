@@ -53,8 +53,8 @@ func (c call) Check(vars map[Var]bool) error {
 	return nil
 }
 
-func (comment) Check(vars map[Var]bool) error {
-	return nil
+func (c comment) Check(vars map[Var]bool) error {
+	return c.expr.Check(vars)
 }
 
 func (nop) Check(vars map[Var]bool) error {
