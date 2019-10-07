@@ -56,6 +56,12 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("Failed changing mode! (%v)", err)
 	}
 
+	// change structure to file
+	_, err = sendAndRead(sender, "STRU F", "200")
+	if err != nil {
+		t.Fatalf("Failed changing structure! (%v)", err)
+	}
+
 	_, err = sendAndRead(sender, "QUIT", "221")
 	if err != nil {
 		t.Fatalf("Quit failed! (%v)", err)

@@ -45,17 +45,24 @@ func main() {
 	}
 }
 
-type FTPMode int
+type FTPStructure int
 
 const (
-	FILE FTPMode = iota
+	FILE FTPStructure = iota
 	RECORD
 )
 
+type FTPMode int
+
+const (
+	STREAM FTPMode = iota
+)
+
 type FTPConnection struct {
-	loggedIn bool
-	user     string
-	mode     FTPMode
+	loggedIn  bool
+	user      string
+	structure FTPStructure
+	mode      FTPMode
 	net.Conn
 }
 
@@ -143,17 +150,28 @@ func (c FTPConnection) parseType(t, f string) (err error) {
 		}
 	}
 
-	return fmt.Errorf("Wrond type: %v, %v", t, f)
+	return fmt.Errorf("Wrong type: %v, %v", t, f)
 }
 
 func (c FTPConnection) parseMode(mode string) (err error) {
+	// only supported stream
 	switch strings.ToUpper(mode) {
 	case "S":
-		c.mode = FILE
+		c.mode = STREAM
+		return nil
+	}
+
+	return fmt.Errorf("Wrong mode: %v", mode)
+}
+
+func (c FTPConnection) parseStructure(structure string) (err error) {
+	switch strings.ToUpper(structure) {
+	case "F":
+		c.structure = FILE
 	case "R":
-		c.mode = RECORD
+		c.structure = RECORD
 	default:
-		return fmt.Errorf("Wrong mode: %v", mode)
+		return fmt.Errorf("Wrong structure: %v", structure)
 	}
 
 	return nil
@@ -246,10 +264,22 @@ func handleConn(conn net.Conn) {
 			}
 			c.replyOkay()
 		case "STRU":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
+
 			if len(tokens) != 2 {
 				c.replyInvalidParamsError()
 				continue
 			}
+			err = c.parseStructure(tokens[1])
+			if err != nil {
+				c.replyParseParamsError()
+				log.Println(err)
+				continue
+			}
+			c.replyOkay()
 		case "RETR":
 			if len(tokens) != 2 {
 				c.replyInvalidParamsError()
