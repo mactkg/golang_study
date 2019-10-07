@@ -136,6 +136,8 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("Data connection should be closed (%v)", err)
 	}
 
+	// how can i test uploading/downloading file...
+
 	_, err = sendAndRead(sender, "QUIT", "221")
 	if err != nil {
 		t.Fatalf("Quit failed! (%v)", err)

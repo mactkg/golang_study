@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -135,6 +137,11 @@ func (c FTPConnection) replyNotLoggedIn() {
 	fmt.Fprint(c, "530 Not logged in.\r\n")
 }
 
+// 550
+func (c FTPConnection) replyRequestedActionNotTaken() {
+	fmt.Fprintf(c, "550 Requested action not taken.\r\n")
+}
+
 func (c FTPConnection) loginRequired() error {
 	if !c.loggedIn {
 		c.loginRequired()
@@ -176,6 +183,44 @@ func (c FTPConnection) ls(path string) error {
 		c.replyTransferAborted()
 	}
 
+	return nil
+}
+
+func (c FTPConnection) get(path string) error {
+	// opening file
+	f, err := os.Open(path)
+	if err != nil {
+		c.replyRequestedActionNotTaken()
+		return fmt.Errorf("Can't load %v (%v)", path, err)
+	}
+	defer f.Close()
+
+	// opening data connection
+	if c.dataAddr == "" {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("User should be set data address")
+	}
+	dataConn, err := net.DialTimeout("tcp", c.dataAddr, 3*time.Second)
+	if err != nil {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("Can't open connection: %v", c.dataAddr)
+	}
+	defer func() {
+		c.replyClosingDataConn()
+		dataConn.Close()
+	}()
+	c.replyOpeningDataConn()
+
+	// send
+	_, err = io.Copy(dataConn, f)
+	if err != nil {
+		c.replyTransferAborted()
+	}
+
+	_, err = dataConn.Write([]byte("\r\n")) // TODO: find more great way to tell EOF
+	if err != nil {
+		c.replyTransferAborted()
+	}
 	return nil
 }
 
@@ -349,10 +394,22 @@ func handleConn(conn net.Conn) {
 			}
 			c.replyOkay()
 		case "RETR":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
 			if len(tokens) != 2 {
 				c.replyInvalidParamsError()
 				continue
 			}
+
+			err = c.get(tokens[1])
+			if err != nil {
+				c.replyParseParamsError()
+				log.Println(err)
+				continue
+			}
+
 		case "STOR":
 			if len(tokens) != 2 {
 				c.replyInvalidParamsError()
