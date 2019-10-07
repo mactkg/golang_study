@@ -56,6 +56,12 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("Failed changing mode! (%v)", err)
 	}
 
+	// NOOP!
+	_, err = sendAndRead(sender, "NOOP", "200")
+	if err != nil {
+		t.Fatalf("NOOP command should be return 200 (%v)", err)
+	}
+
 	// change structure to file
 	_, err = sendAndRead(sender, "STRU F", "200")
 	if err != nil {

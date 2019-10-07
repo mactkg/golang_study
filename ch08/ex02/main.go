@@ -295,6 +295,7 @@ func handleConn(conn net.Conn) {
 				c.replyInvalidParamsError()
 				continue
 			}
+			c.replyOkay()
 		default:
 			c.replyInvalidActionError()
 		}
