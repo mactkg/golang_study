@@ -6,15 +6,11 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
-func sendAndRead(c net.Conn, str string, code string) (string, error) {
+func readCheck(c net.Conn, code string) (string, error) {
 	scanner := bufio.NewScanner(c)
-	_, err := c.Write([]byte(str + "\n"))
-	if err != nil {
-		return "", err
-	}
-
 	ok := scanner.Scan()
 	if !ok {
 		return "", fmt.Errorf("Can't recieve data")
@@ -27,19 +23,53 @@ func sendAndRead(c net.Conn, str string, code string) (string, error) {
 	return text, nil
 }
 
+func sendAndRead(c net.Conn, str string, code string) (string, error) {
+	_, err := c.Write([]byte(str + "\n"))
+	if err != nil {
+		return "", err
+	}
+
+	return readCheck(c, code)
+}
+
+func handleData(d net.Conn, sender chan string) {
+	defer d.Close()
+
+	scanner := bufio.NewScanner(d)
+	for scanner.Scan() {
+		sender <- scanner.Text()
+	}
+}
+
 func TestGoldenPath(t *testing.T) {
+	dataCh := make(chan string)
+	data, err := net.Listen("tcp", "localhost:5678")
+	if err != nil {
+		t.Fatalf("Can't listen socket for data connection! (%v)", err)
+	}
+	go func(d net.Listener, ch chan string) {
+		for {
+			conn, err := d.Accept()
+			if err != nil {
+				t.Errorf("Something happend in data server goroutine (%v)", err)
+			}
+			t.Logf("New connection is established: %v", conn)
+			go handleData(conn, ch)
+		}
+
+	}(data, dataCh)
+
 	reciever, sender := net.Pipe()
-	scanner := bufio.NewScanner(sender)
 	go handleConn(reciever)
 
-	ok := scanner.Scan()
-	text := scanner.Text()
-	if !ok || strings.Index(text, "220") != 0 {
-		t.Fatalf("Connection Failed: %v", text)
+	// welcome
+	_, err = readCheck(sender, "220")
+	if err != nil {
+		t.Fatalf("FTP Server should be return welcome message")
 	}
 
 	// login
-	_, err := sendAndRead(sender, "USER kenta", "230")
+	_, err = sendAndRead(sender, "USER kenta", "230")
 	if err != nil {
 		t.Fatalf("Login failed! (%v)", err)
 	}
@@ -66,6 +96,44 @@ func TestGoldenPath(t *testing.T) {
 	_, err = sendAndRead(sender, "STRU F", "200")
 	if err != nil {
 		t.Fatalf("Failed changing structure! (%v)", err)
+	}
+
+	// change port
+	_, err = sendAndRead(sender, "PORT 127,0,0,1,22,46", "200")
+	if err != nil {
+		t.Fatalf("Failed changing addr for port! (%v)", err)
+	}
+
+	// Check ls
+	_, err = sendAndRead(sender, "LIST", "150")
+	if err != nil {
+		t.Fatalf("Failed ls (%v)", err)
+	}
+	select {
+	case res := <-dataCh:
+		t.Logf("Recieved: %v", res)
+	case <-time.After(3 * time.Second):
+		t.Fatalf("Data connection should be recieved something")
+	}
+	_, err = readCheck(sender, "226")
+	if err != nil {
+		t.Fatalf("Data connection should be closed (%v)", err)
+	}
+
+	// Check ls again
+	_, err = sendAndRead(sender, "LIST /usr/local/", "150")
+	if err != nil {
+		t.Fatalf("Failed ls (%v)", err)
+	}
+	select {
+	case res := <-dataCh:
+		t.Logf("Recieved: %v", res)
+	case <-time.After(3 * time.Second):
+		t.Fatalf("Data connection should be recieved something")
+	}
+	_, err = readCheck(sender, "226")
+	if err != nil {
+		t.Fatalf("Data connection should be closed (%v)", err)
 	}
 
 	_, err = sendAndRead(sender, "QUIT", "221")

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 /*
@@ -64,7 +66,13 @@ type FTPConnection struct {
 	structure FTPStructure
 	mode      FTPMode
 	dataAddr  string
+	dataConn  net.Conn
 	net.Conn
+}
+
+// 150
+func (c FTPConnection) replyOpeningDataConn() {
+	fmt.Fprintln(c, "150 File status okay; about to open data connection.")
 }
 
 // 200
@@ -82,9 +90,29 @@ func (c FTPConnection) replyClosingConn() {
 	fmt.Fprintln(c, "221 Service closing control connection.")
 }
 
+// 226
+func (c FTPConnection) replyClosingDataConn() {
+	fmt.Fprintln(c, "226 Closing data connection.")
+}
+
 // 230
 func (c FTPConnection) replyLoggedIn() {
 	fmt.Fprintln(c, "230 User logged in, proceed.")
+}
+
+// 425
+func (c FTPConnection) replyCantOpenDataConn() {
+	fmt.Fprintln(c, "425 Can't open data connection.")
+}
+
+// 426
+func (c FTPConnection) replyTransferAborted() {
+	fmt.Fprintln(c, "426 Connection closed; transfer aborted.")
+}
+
+// 451
+func (c FTPConnection) replyLocalError() {
+	fmt.Fprintln(c, "451 Requested action aborted. Local error in processing.")
 }
 
 // 501
@@ -115,7 +143,43 @@ func (c FTPConnection) loginRequired() error {
 	return nil
 }
 
-func (c FTPConnection) parsePort(in string) (err error) {
+func (c FTPConnection) ls(path string) error {
+	if path == "" {
+		path = "."
+	}
+
+	// opening data connection
+	if c.dataAddr == "" {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("User should be set data address")
+	}
+	dataConn, err := net.DialTimeout("tcp", c.dataAddr, 3*time.Second)
+	if err != nil {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("Can't open connection: %v", c.dataAddr)
+	}
+	defer func() {
+		c.replyClosingDataConn()
+		dataConn.Close()
+	}()
+	c.replyOpeningDataConn()
+
+	// ls
+	filenames, err := filepath.Glob(path + "/*")
+	if err != nil {
+		c.replyLocalError()
+		return fmt.Errorf("Local Error: (%v)", err)
+	}
+
+	_, err = dataConn.Write([]byte(strings.Join(filenames, "\t") + "\n"))
+	if err != nil {
+		c.replyTransferAborted()
+	}
+
+	return nil
+}
+
+func (c *FTPConnection) parsePort(in string) (err error) {
 	// split addr and port
 	// TODO: we have to check range of ip or port
 	//       especially > 0 check
@@ -126,7 +190,7 @@ func (c FTPConnection) parsePort(in string) (err error) {
 		return
 	}
 
-	ip, p := res[1:5], res[6:7]
+	ip, p := res[1:5], res[5:7]
 	port_high, err := strconv.ParseInt(p[0], 0, 64)
 	if err != nil {
 		return
@@ -154,7 +218,7 @@ func (c FTPConnection) parseType(t, f string) (err error) {
 	return fmt.Errorf("Wrong type: %v, %v", t, f)
 }
 
-func (c FTPConnection) parseMode(mode string) (err error) {
+func (c *FTPConnection) parseMode(mode string) (err error) {
 	// only supported stream
 	switch strings.ToUpper(mode) {
 	case "S":
@@ -165,7 +229,7 @@ func (c FTPConnection) parseMode(mode string) (err error) {
 	return fmt.Errorf("Wrong mode: %v", mode)
 }
 
-func (c FTPConnection) parseStructure(structure string) (err error) {
+func (c *FTPConnection) parseStructure(structure string) (err error) {
 	switch strings.ToUpper(structure) {
 	case "F":
 		c.structure = FILE
@@ -184,7 +248,10 @@ func (c FTPConnection) parseStructure(structure string) (err error) {
 // FTPConnection have a net.Conn, so it's able to reply error message.
 func handleConn(conn net.Conn) {
 	defer conn.Close()
-	c := FTPConnection{Conn: conn}
+
+	c := FTPConnection{
+		Conn: conn,
+	}
 
 	c.sendWelcome()
 	scanner := bufio.NewScanner(c)
@@ -297,8 +364,33 @@ func handleConn(conn net.Conn) {
 				continue
 			}
 			c.replyOkay()
+		case "LIST":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
+			switch len(tokens) {
+			case 1:
+				c.ls("")
+			case 2:
+				c.ls(tokens[1])
+			default:
+				c.replyInvalidParamsError()
+				continue
+			}
+		case "PWD":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
+			if len(tokens) != 1 {
+				c.replyInvalidParamsError()
+				continue
+			}
+			c.ls("")
 		default:
 			c.replyInvalidActionError()
 		}
+
 	}
 }
