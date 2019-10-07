@@ -45,20 +45,66 @@ func main() {
 	}
 }
 
-func sendWelcome(c net.Conn) {
+type FTPMode int
+
+const (
+	FILE FTPMode = iota
+	RECORD
+)
+
+type FTPConnection struct {
+	loggedIn bool
+	user     string
+	mode     FTPMode
+	net.Conn
+}
+
+// 200
+func (c FTPConnection) replyOkay() {
+	fmt.Fprintln(c, "200 Command okay.")
+}
+
+// 220
+func (c FTPConnection) sendWelcome() {
 	fmt.Fprintln(c, "220 Service ready for new user.")
 }
 
-func replyInvalidParamsError(c net.Conn) {
+// 221
+func (c FTPConnection) replyClosingConn() {
+	fmt.Fprintln(c, "221 Service closing control connection.")
+}
+
+// 230
+func (c FTPConnection) replyLoggedIn() {
+	fmt.Fprintln(c, "230 User logged in, proceed.")
+}
+
+// 501
+func (c FTPConnection) replyInvalidParamsError() {
 	fmt.Fprintln(c, "501 Syntax error in parameters or arguments.")
 }
 
-func replyInvalidActionError(c net.Conn) {
+// 502
+func (c FTPConnection) replyInvalidActionError() {
 	fmt.Fprintln(c, "502 Command not implemented.")
 }
 
-func replyParseParamsError(c net.Conn) {
+// 504
+func (c FTPConnection) replyParseParamsError() {
 	fmt.Fprintln(c, "504 Command not implemented for that parameter.")
+}
+
+// 530
+func (c FTPConnection) replyNotLoggedIn() {
+	fmt.Fprintf(c, "530 Not logged in.")
+}
+
+func (c FTPConnection) loginRequired() error {
+	if !c.loggedIn {
+		c.loginRequired()
+		return fmt.Errorf("Not logged in.")
+	}
+	return nil
 }
 
 func parsePort(in string) (addr string, err error) {
@@ -87,10 +133,41 @@ func parsePort(in string) (addr string, err error) {
 	return
 }
 
-func handleConn(c net.Conn) {
-	defer c.Close()
+func (c FTPConnection) parseType(t, f string) (err error) {
+	// only supported ascii non print
+	switch strings.ToUpper(t) {
+	case "A":
+		switch strings.ToUpper(f) {
+		case "N":
+			return nil
+		}
+	}
 
-	sendWelcome(c)
+	return fmt.Errorf("Wrond type: %v, %v", t, f)
+}
+
+func (c FTPConnection) parseMode(mode string) (err error) {
+	switch strings.ToUpper(mode) {
+	case "S":
+		c.mode = FILE
+	case "R":
+		c.mode = RECORD
+	default:
+		return fmt.Errorf("Wrong mode: %v", mode)
+	}
+
+	return nil
+}
+
+// FIXME:
+// it's ambigous whether FTPConnection send error message or not.
+// error should be returned because control flow of switch-case but
+// FTPConnection have a net.Conn, so it's able to reply error message.
+func handleConn(conn net.Conn) {
+	defer conn.Close()
+	c := FTPConnection{Conn: conn}
+
+	c.sendWelcome()
 	scanner := bufio.NewScanner(c)
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -100,62 +177,96 @@ func handleConn(c net.Conn) {
 		switch strings.ToUpper(tokens[0]) {
 		case "USER":
 			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
-			user := tokens[1]
-			log.Printf("Login user '%s'\n", user)
+			c.user = tokens[1]
+			c.loggedIn = true
+			log.Printf("Login user '%s'\n", c.user)
+			c.replyLoggedIn()
 		case "QUIT":
 			if len(tokens) != 1 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 			log.Printf("Bye~\n")
-			return
+			c.replyClosingConn()
 		case "PORT":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
+
 			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 			addr, err := parsePort(tokens[1])
 			if err != nil {
-				replyParseParamsError(c)
+				c.replyParseParamsError()
 				log.Println(tokens[1])
 				continue
 			}
 			log.Printf("Create data connection to %s\n", addr)
+			c.replyOkay()
 		case "TYPE":
-			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+			err := c.loginRequired()
+			if err != nil {
 				continue
 			}
+
+			// only supported ascii non print, so
+			// length of tokens should be 3 ("TYPE A N")
+			if len(tokens) != 3 {
+				c.replyInvalidParamsError()
+				continue
+			}
+			err = c.parseType(tokens[1], tokens[2])
+			if err != nil {
+				c.replyParseParamsError()
+				log.Println(err)
+				continue
+			}
+			c.replyOkay()
 		case "MODE":
-			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+			err := c.loginRequired()
+			if err != nil {
 				continue
 			}
+
+			if len(tokens) != 2 {
+				c.replyInvalidParamsError()
+				continue
+			}
+			err = c.parseMode(tokens[1])
+			if err != nil {
+				c.replyParseParamsError()
+				log.Println(err)
+				continue
+			}
+			c.replyOkay()
 		case "STRU":
 			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 		case "RETR":
 			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 		case "STOR":
 			if len(tokens) != 2 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 		case "NOOP":
 			if len(tokens) != 1 {
-				replyInvalidParamsError(c)
+				c.replyInvalidParamsError()
 				continue
 			}
 		default:
-			replyInvalidActionError(c)
+			c.replyInvalidActionError()
 		}
 	}
 }
