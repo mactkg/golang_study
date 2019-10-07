@@ -63,6 +63,7 @@ type FTPConnection struct {
 	user      string
 	structure FTPStructure
 	mode      FTPMode
+	dataAddr  string
 	net.Conn
 }
 
@@ -114,7 +115,7 @@ func (c FTPConnection) loginRequired() error {
 	return nil
 }
 
-func parsePort(in string) (addr string, err error) {
+func (c FTPConnection) parsePort(in string) (err error) {
 	// split addr and port
 	// TODO: we have to check range of ip or port
 	//       especially > 0 check
@@ -136,7 +137,7 @@ func parsePort(in string) (addr string, err error) {
 	}
 	port := port_high*256 + port_low
 
-	addr = fmt.Sprintf("%s.%s.%s.%s:%d", ip[0], ip[1], ip[2], ip[3], port)
+	c.dataAddr = fmt.Sprintf("%s.%s.%s.%s:%d", ip[0], ip[1], ip[2], ip[3], port)
 	return
 }
 
@@ -219,13 +220,13 @@ func handleConn(conn net.Conn) {
 				c.replyInvalidParamsError()
 				continue
 			}
-			addr, err := parsePort(tokens[1])
+			err = c.parsePort(tokens[1])
 			if err != nil {
 				c.replyParseParamsError()
 				log.Println(tokens[1])
 				continue
 			}
-			log.Printf("Create data connection to %s\n", addr)
+			log.Printf("Create data connection to %s\n", c.dataAddr)
 			c.replyOkay()
 		case "TYPE":
 			err := c.loginRequired()
