@@ -224,6 +224,39 @@ func (c FTPConnection) get(path string) error {
 	return nil
 }
 
+func (c FTPConnection) put(path string) error {
+	// opening file
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		c.replyRequestedActionNotTaken()
+		return fmt.Errorf("Can't load %v (%v)", path, err)
+	}
+	defer f.Close()
+
+	// opening data connection
+	if c.dataAddr == "" {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("User should be set data address")
+	}
+	dataConn, err := net.DialTimeout("tcp", c.dataAddr, 3*time.Second)
+	if err != nil {
+		c.replyCantOpenDataConn()
+		return fmt.Errorf("Can't open connection: %v", c.dataAddr)
+	}
+	defer func() {
+		c.replyClosingDataConn()
+		dataConn.Close()
+	}()
+	c.replyOpeningDataConn()
+
+	// send
+	_, err = io.Copy(f, dataConn)
+	if err != nil {
+		c.replyTransferAborted()
+	}
+	return nil
+}
+
 func (c *FTPConnection) parsePort(in string) (err error) {
 	// split addr and port
 	// TODO: we have to check range of ip or port
@@ -411,8 +444,19 @@ func handleConn(conn net.Conn) {
 			}
 
 		case "STOR":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
 			if len(tokens) != 2 {
 				c.replyInvalidParamsError()
+				continue
+			}
+
+			err = c.put(tokens[1])
+			if err != nil {
+				c.replyParseParamsError()
+				log.Println(err)
 				continue
 			}
 		case "NOOP":
