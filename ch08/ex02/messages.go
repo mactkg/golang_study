@@ -32,6 +32,11 @@ func (c FTPConnection) replyLoggedIn() {
 	fmt.Fprint(c, "230 User logged in, proceed.\r\n")
 }
 
+// 250
+func (c FTPConnection) replyCompleted() {
+	fmt.Fprint(c, "250 Requested file action okay, completed.\r\n")
+}
+
 // 425
 func (c FTPConnection) replyCantOpenDataConn() {
 	fmt.Fprint(c, "425 Can't open data connection.\r\n")

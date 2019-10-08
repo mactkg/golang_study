@@ -211,6 +211,16 @@ func handleConn(conn net.Conn) {
 				continue
 			}
 			c.ls("")
+		case "CWD":
+			err := c.loginRequired()
+			if err != nil {
+				continue
+			}
+			if len(tokens) != 2 {
+				c.replyInvalidParamsError()
+				continue
+			}
+			c.cd(tokens[1])
 		default:
 			c.replyInvalidActionError()
 		}

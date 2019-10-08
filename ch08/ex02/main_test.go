@@ -120,14 +120,23 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("Data connection should be closed (%v)", err)
 	}
 
+	// cd
+	_, err = sendAndRead(sender, "CWD temp_test", "250")
+	if err != nil {
+		t.Fatalf("Failed cd (%v)", err)
+	}
+
 	// Check ls again
-	_, err = sendAndRead(sender, "LIST /usr/local/", "150")
+	_, err = sendAndRead(sender, "LIST", "150")
 	if err != nil {
 		t.Fatalf("Failed ls (%v)", err)
 	}
 	select {
 	case res := <-dataCh:
 		t.Logf("Recieved: %v", res)
+		if strings.Index(res, "top_secret") == -1 {
+			t.Log("CWD seems to be failed")
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatalf("Data connection should be recieved something")
 	}

@@ -119,6 +119,17 @@ func (c FTPConnection) put(path string) error {
 	return nil
 }
 
+func (c FTPConnection) cd(path string) error {
+	err := os.Chdir(path)
+	if err != nil {
+		c.replyRequestedActionNotTaken()
+		return err
+	}
+
+	c.replyCompleted()
+	return nil
+}
+
 func (c *FTPConnection) parsePort(in string) (err error) {
 	// split addr and port
 	// TODO: we have to check range of ip or port

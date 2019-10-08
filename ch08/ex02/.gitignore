@@ -1,0 +1,3 @@
+temp_test/*
+!temp_test/.gitkeep
+!temp_test/top_secret.txt
