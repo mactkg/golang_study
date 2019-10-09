@@ -13,10 +13,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"time"
-
 	"gopl.io/ch5/links"
+	"log"
+	"sync"
 )
 
 type page struct {
@@ -39,6 +38,8 @@ func main() {
 	flag.IntVar(&depth, "depth", 3, "Depth")
 	flag.Parse()
 
+	wg := sync.WaitGroup{}
+
 	worklist := make(chan []page)  // lists of URLs, may have duplicates
 	unseenPages := make(chan page) // de-duplicated URLs
 
@@ -54,11 +55,13 @@ func main() {
 	// Create 20 crawler goroutines to fetch each unseen link.
 	for i := 0; i < 20; i++ {
 		go func() {
+			wg.Add(1)
 			for p := range unseenPages {
+
 				foundLinks := crawl(p)
 
 				if p.depth >= depth {
-					continue
+					break
 				}
 
 				go func(depth int) {
@@ -69,36 +72,25 @@ func main() {
 					worklist <- pages
 				}(p.depth+1)
 			}
+			wg.Done()
 		}()
 	}
 
 	// The main goroutine de-duplicates worklist items
 	// and sends the unseen ones to the crawlers.
 	seen := make(map[string]bool)
-	for {
-		select {
-		case list := <- worklist:
+
+	go func() {
+		for list := range worklist {
 			for _, p := range list {
 				if !seen[p.url] {
 					seen[p.url] = true
 					unseenPages <- p
 				}
 			}
-		case <-time.After(3 * time.Second):
-			goto DONE
 		}
-	}
-DONE:
-	/*
-	for list := range worklist {
-		for _, p := range list {
-			if !seen[p.url] {
-				seen[p.url] = true
-				unseenPages <- p
-			}
-		}
-	}
-	 */
+	}()
+	wg.Wait()
 }
 
 //!-
