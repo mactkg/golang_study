@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 	"testing"
@@ -32,32 +33,82 @@ func sendAndRead(c net.Conn, str string, code string) (string, error) {
 	return readCheck(c, code)
 }
 
-func handleData(d net.Conn, sender chan string) {
+func handleData(d net.Conn, reciever chan string, sender chan []byte, clean chan struct{}) {
 	defer d.Close()
 
-	scanner := bufio.NewScanner(d)
-	for scanner.Scan() {
-		sender <- scanner.Text()
+	// reciever
+	go func(d net.Conn, r chan string) {
+		scanner := bufio.NewScanner(d)
+		for scanner.Scan() {
+			r <- scanner.Text()
+		}
+	}(d, reciever)
+
+	// sender
+	select {
+	case buf := <-sender:
+		fmt.Printf("Got: %v", buf)
+		d.Write(buf)
+	case <-clean:
+		fmt.Printf("clean!")
+		break
 	}
+
+	fmt.Printf("bye!")
+}
+
+// from: https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
+var src = rand.NewSource(time.Now().UnixNano())
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+func randString(n int) string {
+	sb := strings.Builder{}
+	sb.Grow(n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			sb.WriteByte(letterBytes[idx])
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return sb.String()
 }
 
 func TestGoldenPath(t *testing.T) {
 	dataCh := make(chan string)
+	sendCh := make(chan []byte)
+	clean := make(chan struct{})
+	defer func() {
+		clean <- struct{}{}
+	}()
+
 	data, err := net.Listen("tcp", "localhost:5678")
 	if err != nil {
 		t.Fatalf("Can't listen socket for data connection! (%v)", err)
 	}
-	go func(d net.Listener, ch chan string) {
+	go func(d net.Listener, r chan string, s chan []byte, c chan struct{}) {
 		for {
 			conn, err := d.Accept()
 			if err != nil {
 				t.Errorf("Something happend in data server goroutine (%v)", err)
 			}
 			t.Logf("New connection is established: %v", conn)
-			go handleData(conn, ch)
+			go handleData(conn, r, s, c)
 		}
 
-	}(data, dataCh)
+	}(data, dataCh, sendCh, clean)
 
 	reciever, sender := net.Pipe()
 	go handleConn(reciever)
