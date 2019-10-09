@@ -38,8 +38,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	logger := log.New(os.Stdout, addr, log.LstdFlags)
-	logger.Printf("Start listening at %s", addr)
+	logger := log.New(os.Stdout, fmt.Sprintf("[%s] ", addr), log.LstdFlags)
+	logger.Printf("Start listening at %s\n", addr)
 
 	//!+
 	for {
@@ -48,7 +48,7 @@ func main() {
 			log.Print(err) // e.g., connection aborted
 			continue
 		}
-		logger.Printf("New connection! from %s", conn.RemoteAddr())
+		logger.Printf("New connection! from %s\n", conn.RemoteAddr())
 		go handleConn(conn) // handle connections concurrently
 	}
 	//!-
