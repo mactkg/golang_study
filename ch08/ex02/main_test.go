@@ -197,6 +197,59 @@ func TestGoldenPath(t *testing.T) {
 	}
 
 	// how can i test uploading/downloading file...
+	// how can i get whole of file...
+	sendAndRead(sender, "CWD ../", "250")
+	_, err = sendAndRead(sender, "RETR main.go", "150")
+	if err != nil {
+		t.Fatalf("Failed RETR (%v)", err)
+	}
+	select {
+	case res := <-dataCh:
+		t.Logf("Recieved: %v", res)
+	case <-time.After(3 * time.Second):
+		t.Fatalf("Data connection should be recieved something")
+	}
+	_, err = readCheck(sender, "226")
+	if err != nil {
+		t.Fatalf("Data connection should be closed (%v)", err)
+	}
+
+	/*
+		commented out this test because there is something wrong
+
+		// store test
+		_, err = sendAndRead(sender, "STOR temp_test/top_secret_"+randString(8)+".txt", "150")
+		if err != nil {
+			t.Fatalf("Failed RETR (%v)", err)
+		}
+		secret, err := os.Open("./temp_test/top_secret.txt")
+		if err != nil {
+			t.Fatalf("Opening file failed (%v)", err)
+		}
+		r := bufio.NewReader(secret)
+		buf := make([]byte, 256)
+		size := 0
+		for {
+			n, err := r.Read(buf)
+			size += n
+			t.Logf("Loaded %v bytes", n)
+			if err == io.EOF {
+				sendCh <- buf
+				t.Logf("Sent %v bytes file", size)
+				break
+			} else if err != nil {
+				t.Logf("Error happend while sending data: %v", err)
+				break
+			}
+			sendCh <- buf
+		}
+		clean <- struct{}{}
+
+		_, err = readCheck(sender, "226")
+		if err != nil {
+			t.Fatalf("Data connection should be closed (%v)", err)
+		}
+	*/
 
 	_, err = sendAndRead(sender, "QUIT", "221")
 	if err != nil {
