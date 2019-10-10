@@ -59,7 +59,7 @@ func broadcaster() {
 
 //!+handleConn
 func handleConn(conn net.Conn) {
-	out := make(chan string) // outgoing client messages
+	out := make(chan string, 10) // outgoing client messages
 	in := make(chan string) // ingoing client messages
 	go clientWriter(conn, out)
 	go clientReader(conn, in)
@@ -73,18 +73,15 @@ func handleConn(conn net.Conn) {
 	entering <- user
 
 
-	timer := time.NewTimer(timeout)
-	go func() {
-		<-timer.C
-		conn.Close()
-	}()
-
-	input := bufio.NewScanner(conn)
-	for input.Scan() {
-		messages <- who + ": " + input.Text()
-		timer.Reset(timeout)
+READ:
+	for {
+		select {
+		case str := <-in:
+			messages <- who + ": " + str
+		case <-time.After(timeout):
+			break READ
+		}
 	}
-	// NOTE: ignoring potential errors from input.Err()
 
 	leaving <- user
 	messages <- who + " has left"
