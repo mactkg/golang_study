@@ -15,7 +15,10 @@ import (
 )
 
 //!+broadcaster
-type client chan<- string // an outgoing message channel
+type client struct {
+	w chan<- string // an outgoing message channel
+	name string
+}
 
 var (
 	entering = make(chan client)
@@ -31,15 +34,20 @@ func broadcaster() {
 			// Broadcast incoming message to all
 			// clients' outgoing message channels.
 			for cli := range clients {
-				cli <- msg
+				cli.w <- msg
 			}
 
 		case cli := <-entering:
 			clients[cli] = true
+			msg := "User list:\n"
+			for c, _ := range clients {
+				msg += fmt.Sprintf("\t%s\n", c.name)
+			}
+			cli.w <- msg
 
 		case cli := <-leaving:
 			delete(clients, cli)
-			close(cli)
+			close(cli.w)
 		}
 	}
 }
@@ -52,9 +60,10 @@ func handleConn(conn net.Conn) {
 	go clientWriter(conn, ch)
 
 	who := conn.RemoteAddr().String()
+	user := client{ch, who}
 	ch <- "You are " + who
 	messages <- who + " has arrived"
-	entering <- ch
+	entering <- user
 
 	input := bufio.NewScanner(conn)
 	for input.Scan() {
@@ -62,7 +71,7 @@ func handleConn(conn net.Conn) {
 	}
 	// NOTE: ignoring potential errors from input.Err()
 
-	leaving <- ch
+	leaving <- user
 	messages <- who + " has left"
 	conn.Close()
 }
