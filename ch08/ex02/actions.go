@@ -13,9 +13,15 @@ import (
 )
 
 func (c FTPConnection) ls(path string) error {
-	if path == "" {
-		path = "."
+	if !filepath.IsAbs(path) {
+		p, err := filepath.Abs(filepath.Join(c.cwd, path))
+		path = p
+		if err != nil {
+			c.replyRequestedActionNotTaken()
+			return err
+		}
 	}
+	fmt.Println("ls: " + path)
 
 	// opening data connection
 	if c.dataAddr == "" {
@@ -34,7 +40,7 @@ func (c FTPConnection) ls(path string) error {
 	c.replyOpeningDataConn()
 
 	// ls
-	filenames, err := filepath.Glob(path + "/*")
+	filenames, err := filepath.Glob(filepath.Join(path, "/*"))
 	if err != nil {
 		c.replyLocalError()
 		return fmt.Errorf("Local Error: (%v)", err)
@@ -49,6 +55,15 @@ func (c FTPConnection) ls(path string) error {
 }
 
 func (c FTPConnection) get(path string) error {
+	if !filepath.IsAbs(path) {
+		p, err := filepath.Abs(filepath.Join(c.cwd, path))
+		path = p
+		if err != nil {
+			c.replyRequestedActionNotTaken()
+			return err
+		}
+	}
+
 	// opening file
 	f, err := os.Open(path)
 	if err != nil {
@@ -87,6 +102,16 @@ func (c FTPConnection) get(path string) error {
 }
 
 func (c FTPConnection) put(path string) error {
+	if !filepath.IsAbs(path) {
+		p, err := filepath.Abs(filepath.Join(c.cwd, path))
+		path = p
+		if err != nil {
+			c.replyRequestedActionNotTaken()
+			return err
+		}
+	}
+
+
 	// opening file
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -119,15 +144,32 @@ func (c FTPConnection) put(path string) error {
 	return nil
 }
 
-func (c FTPConnection) cd(path string) error {
-	err := os.Chdir(path)
+func (c *FTPConnection) cd(path string) error {
+	nwd, err := filepath.Abs(filepath.Join(c.cwd, path))
 	if err != nil {
 		c.replyRequestedActionNotTaken()
 		return err
 	}
 
+	check, err := exists(nwd)
+	if err != nil {
+		c.replyRequestedActionNotTaken()
+		return err
+	} else if !check {
+		c.replyRequestedActionNotTaken()
+		return fmt.Errorf("%v not found", nwd)
+	}
+
+	c.cwd = nwd
 	c.replyCompleted()
 	return nil
+}
+
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil { return true, nil }
+	if os.IsNotExist(err) { return false, nil }
+	return true, err
 }
 
 func (c *FTPConnection) parsePort(in string) (err error) {

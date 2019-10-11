@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -49,9 +51,15 @@ func main() {
 func handleConn(conn net.Conn) {
 	defer conn.Close()
 
+	wd, err:= os.Getwd()
+	if err != nil {
+		log.Println(err)
+	}
 	c := FTPConnection{
 		Conn: conn,
+		cwd: wd,
 	}
+	fmt.Println(wd)
 
 	c.sendWelcome()
 	scanner := bufio.NewScanner(c)

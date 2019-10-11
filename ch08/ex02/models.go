@@ -21,6 +21,7 @@ const (
 type FTPConnection struct {
 	loggedIn  bool
 	user      string
+	cwd       string
 	structure FTPStructure
 	mode      FTPMode
 	dataAddr  string
