@@ -30,4 +30,5 @@ func main() {
 
 	<-time.After(time.Second)
 	fmt.Println(<-out)
+	done<- struct{}{}
 }
