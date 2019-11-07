@@ -48,7 +48,7 @@ func main() {
 		go func(target string) {
 			res, err := fetchDeps(target)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error happened while fetching"+dep+": %v\n", err)
+				fmt.Fprintf(os.Stderr, "error happened while fetching"+target+": %v\n", err)
 				resCh <- GoDeps{}
 			}
 			resCh <- *res
