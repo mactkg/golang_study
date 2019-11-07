@@ -1,0 +1,1 @@
+cat icon.png | go run main.go -jpeg -png -gif
