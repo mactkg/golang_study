@@ -257,3 +257,23 @@ func Test(t *testing.T) {
 		// ...ad infinitum...
 	}
 }
+
+func TestEx01(t *testing.T) {
+	type Key struct {
+		name     string
+		otherKey *Key
+	}
+	other := Key{"curry", &Key{"NaN", nil}}
+	structKey := map[Key]string{
+		Key{"foo", &other}: "bar",
+		Key{"mochi", nil}:  "anko",
+	}
+	Display("structKey", structKey)
+
+	type A [3]string
+	arrayKey := map[A]string{
+		A{"Sakana", "Oniku", "Yasai"}:  "Japanese",
+		A{"Fish", "Meat", "Vegetable"}: "English",
+	}
+	Display("arrayKey", arrayKey)
+}
