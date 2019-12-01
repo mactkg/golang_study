@@ -75,6 +75,10 @@ func encode(buf *bytes.Buffer, v reflect.Value, indent int) error {
 	case reflect.Struct: // ((name value) ...)
 		buf.WriteByte('(')
 		for i := 0; i < v.NumField(); i++ {
+			if v.Field(i).IsZero() {
+				continue
+			}
+
 			if i > 0 {
 				buf.WriteString(fmt.Sprintf("\n%*s", indent, " "))
 			}
@@ -92,11 +96,14 @@ func encode(buf *bytes.Buffer, v reflect.Value, indent int) error {
 
 	case reflect.Map: // ((key value) ...)
 		buf.WriteByte('(')
+		indent += 1
 		for i, key := range v.MapKeys() {
+			if v.MapIndex(key).IsZero() {
+				continue
+			}
+
 			if i > 0 {
 				buf.WriteString(fmt.Sprintf("\n%*s", indent, " "))
-			} else {
-				indent += 1
 			}
 			buf.WriteByte('(')
 			if err := encode(buf, key, indent); err != nil {
