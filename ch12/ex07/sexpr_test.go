@@ -4,50 +4,57 @@
 package sexpr
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
 
-func TestZeroValue(t *testing.T) {
-	type Tester struct {
-		Integer  int
-		Float    float64
-		Str      string
-		Boolean  bool
-		IntArray []int
+func Test(t *testing.T) {
+	type Movie struct {
+		Title, Subtitle string
+		Year            int
+		Actor           map[string]string
+		Oscars          []string
+		Sequel          *string
+	}
+	strangelove := Movie{
+		Title:    "Dr. Strangelove",
+		Subtitle: "How I Learned to Stop Worrying and Love the Bomb",
+		Year:     1964,
+		Actor: map[string]string{
+			"Dr. Strangelove":            "Peter Sellers",
+			"Grp. Capt. Lionel Mandrake": "Peter Sellers",
+			"Pres. Merkin Muffley":       "Peter Sellers",
+			"Gen. Buck Turgidson":        "George C. Scott",
+			"Brig. Gen. Jack D. Ripper":  "Sterling Hayden",
+			`Maj. T.J. "King" Kong`:      "Slim Pickens",
+		},
+		Oscars: []string{
+			"Best Actor (Nomin.)",
+			"Best Adapted Screenplay (Nomin.)",
+			"Best Director (Nomin.)",
+			"Best Picture (Nomin.)",
+		},
 	}
 
-	zero := Tester{}
-	nonzero := Tester{10, 10.42, "hi", true, []int{0, 1, 2, 0, 3}}
-
-	// zero values
-	data, err := Marshal(zero)
+	// Encode it
+	data, err := Marshal(strangelove)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Marshal failed: %v", err)
 	}
-	t.Logf("Zero values:\n%v", string(data))
+	t.Logf("Marshal() = %s\n", data)
 
-	var res Tester
-	err = Unmarshal(data, &res)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(res, zero) {
-		t.Fatal("not equal")
-	}
+	buffer := bytes.NewBuffer(data)
+	decoder := NewDecoder(buffer)
 
-	// non zero values
-	data, err = Marshal(nonzero)
-	if err != nil {
-		t.Fatal(err)
+	var movie Movie
+	if err := decoder.Decode(&movie); err != nil {
+		t.Fatalf("Decode failed: %v", err)
 	}
-	t.Logf("Non zero values:\n%v", string(data))
+	t.Logf("Decode() = %+v\n", movie)
 
-	err = Unmarshal(data, &res)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(res, nonzero) {
+	// Check equality.
+	if !reflect.DeepEqual(movie, strangelove) {
 		t.Fatal("not equal")
 	}
 }

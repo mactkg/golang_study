@@ -10,10 +10,32 @@ package sexpr
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"text/scanner"
 )
+
+type Decoder struct {
+	reader io.Reader
+}
+
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{reader: r}
+}
+
+func (dec *Decoder) Decode(v interface{}) (err error) {
+	lex := &lexer{scan: scanner.Scanner{Mode: scanner.GoTokens}}
+	lex.scan.Init(dec.reader)
+	lex.next()
+	defer func() {
+		if x := recover(); x != nil {
+			err = fmt.Errorf("error at %s: %v", lex.scan.Position, x)
+		}
+	}()
+	read(lex, reflect.ValueOf(v).Elem())
+	return nil
+}
 
 //!+Unmarshal
 // Unmarshal parses S-expression data and populates the variable
