@@ -5,6 +5,7 @@ package sexpr
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -73,7 +74,7 @@ func Test(t *testing.T) {
 	t.Logf("MarshalIdent() = %s\n", data)
 }
 
-func TestEx12_3(t *testing.T) {
+func TestPrettyPrint(t *testing.T) {
 	type Movie struct {
 		Title, Subtitle string
 		Year            int
@@ -81,92 +82,80 @@ func TestEx12_3(t *testing.T) {
 		Oscars          []string
 		Sequel          *string
 	}
-	testCases := []struct {
-		desc   string
-		input  interface{}
-		expect string
-	}{
-		{
-			desc: "Boolean",
-			input: struct {
-				t bool
-				f bool
-			}{t: true, f: false},
-			expect: "((t t) (f nil))",
+	strangelove := Movie{
+		Title:    "Dr. Strangelove",
+		Subtitle: "How I Learned to Stop Worrying and Love the Bomb",
+		Year:     1964,
+		Actor: map[string]string{
+			"Dr. Strangelove":            "Peter Sellers",
+			"Grp. Capt. Lionel Mandrake": "Peter Sellers",
+			"Pres. Merkin Muffley":       "Peter Sellers",
+			"Gen. Buck Turgidson":        "George C. Scott",
+			"Brig. Gen. Jack D. Ripper":  "Sterling Hayden",
 		},
-		{
-			desc: "Float",
-			input: struct {
-				v64 float64
-				v32 float32
-			}{v64: float64(4.2112341234), v32: float32(-4.242424242424242)},
-			expect: "((v64 4.211234) (v32 -4.242424))",
-		},
-		{
-			desc: "Complex",
-			input: struct {
-				comp128 complex128
-				comp64  complex64
-			}{comp128: complex(1, 2), comp64: complex64(complex(-1, 2))},
-			expect: "((comp128 #C(1.0, 2.0)) (comp64 #C(-1.0, 2.0)))",
-		},
-		{
-			desc: "nil",
-			input: struct {
-				data *Movie
-			}{data: nil},
-			expect: "((data nil))",
+		Oscars: []string{
+			"Best Actor (Nomin.)",
+			"Best Adapted Screenplay (Nomin.)",
+			"Best Director (Nomin.)",
+			"Best Picture (Nomin.)",
 		},
 	}
-	for _, tC := range testCases {
-		t.Run(tC.desc, func(t *testing.T) {
-			data, err := Marshal(tC.input)
-			if err != nil {
-				t.Fatalf("Error: %v", err)
-			}
-			if string(data) != tC.expect {
-				t.Fatalf("Unexpected result: %v(expected: %v)", string(data), tC.expect)
-			}
-		})
+
+	// Pretty-print it:
+	data, err := Marshal(strangelove)
+	if err != nil {
+		t.Fatal(err)
+	}
+	role := `(Dr. Strangelove|Grp\. Capt\. Lionel Mandrake|Pres\. Merkin Muffley|Gen\. Buck Turgidson|Brig\. Gen\. Jack D\. Ripper|Maj\. T\.J\. "King" Kong)`
+	actor := `(Peter Sellers|George C\. Scott|Sterling Hayden|Slim Pickens)`
+	expect := `\(\(Title "Dr. Strangelove"\)
+ \(Subtitle "How I Learned to Stop Worrying and Love the Bomb"\)
+ \(Year 1964\)
+ \(Actor \(\("` + role + `" "` + actor + `"\)
+         \("` + role + `" "` + actor + `"\)
+         \("` + role + `" "` + actor + `"\)
+         \("` + role + `" "` + actor + `"\)
+         \("` + role + `" "` + actor + `"\)\)\)
+ \(Oscars \("Best Actor \(Nomin\.\)"
+          "Best Adapted Screenplay \(Nomin\.\)"
+          "Best Director \(Nomin\.\)"
+          "Best Picture \(Nomin\.\)"\)\)
+ \(Sequel nil\)\)`
+	r := regexp.MustCompile(expect)
+	if !r.MatchString(string(data)) {
+		t.Fatalf("Wrong indent.\nGot:\n%s\n\nExpected:\n%s\n", data, expect)
 	}
 }
 
-func TestEx12_3_Interface(t *testing.T) {
-	type Input struct {
-		data interface{}
+func TestPPArray(t *testing.T) {
+	data, err := Marshal(struct {
+		ia []int
+	}{ia: []int{1, 2, 3, 4}})
+	if err != nil {
+		t.Fatal(err)
 	}
-	testCases := []struct {
-		desc   string
-		input  Input
-		expect string
-	}{
-		{
-			desc: "Interface",
-			input: Input{data: struct {
-				s string
-				i int
-			}{"foo", 42}},
-			expect: "((data (\"struct { s string; i int }\" ((s \"foo\") (i 42)))))",
-		}, {
-			desc:   "Interface2",
-			input:  Input{data: []int{0, 1, 2, 3}},
-			expect: "((data (\"[]int\" (0 1 2 3))))",
-		},
-		{
-			desc:   "Interface(nil)",
-			input:  Input{data: nil},
-			expect: "((data nil))",
-		},
+	expect := `((ia (1
+      2
+      3
+      4)))`
+	if string(data) != expect {
+		t.Fatalf("Wrong indent.\nGot:\n%s\n\nExpected:\n%s\n", data, expect)
 	}
-	for _, tC := range testCases {
-		t.Run(tC.desc, func(t *testing.T) {
-			data, err := Marshal(tC.input)
-			if err != nil {
-				t.Fatalf("Error: %v", err)
-			}
-			if string(data) != tC.expect {
-				t.Fatalf("Unexpected result: %v(expected: %v)", string(data), tC.expect)
-			}
-		})
+}
+
+func TestPPStruct(t *testing.T) {
+	data, err := Marshal(struct {
+		ia    int
+		st    string
+		strct *struct{}
+	}{ia: 1, st: "string here", strct: nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect := `((ia 1)
+ (st "string here")
+ (strct nil))`
+	if string(data) != expect {
+		t.Fatalf("Wrong indent.\nGot:\n%s\n\nExpected:\n%s\n", data, expect)
 	}
 }

@@ -15,7 +15,7 @@ import (
 // Marshal encodes a Go value in S-expression form.
 func Marshal(v interface{}) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := encode(&buf, reflect.ValueOf(v)); err != nil {
+	if err := encode(&buf, reflect.ValueOf(v), 0); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -25,7 +25,7 @@ func Marshal(v interface{}) ([]byte, error) {
 
 // encode writes to buf an S-expression representation of v.
 //!+encode
-func encode(buf *bytes.Buffer, v reflect.Value) error {
+func encode(buf *bytes.Buffer, v reflect.Value, indent int) error {
 	switch v.Kind() {
 	case reflect.Invalid:
 		buf.WriteString("nil")
@@ -42,7 +42,7 @@ func encode(buf *bytes.Buffer, v reflect.Value) error {
 		fmt.Fprintf(buf, "%q", v.String())
 
 	case reflect.Ptr:
-		return encode(buf, v.Elem())
+		return encode(buf, v.Elem(), indent)
 
 	case reflect.Bool:
 		if v.Bool() {
@@ -62,9 +62,11 @@ func encode(buf *bytes.Buffer, v reflect.Value) error {
 		buf.WriteByte('(')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
-				buf.WriteByte(' ')
+				buf.WriteString(fmt.Sprintf("\n%*s", indent, " "))
+			} else {
+				indent += 1
 			}
-			if err := encode(buf, v.Index(i)); err != nil {
+			if err := encode(buf, v.Index(i), indent); err != nil {
 				return err
 			}
 		}
@@ -74,13 +76,17 @@ func encode(buf *bytes.Buffer, v reflect.Value) error {
 		buf.WriteByte('(')
 		for i := 0; i < v.NumField(); i++ {
 			if i > 0 {
-				buf.WriteByte(' ')
+				buf.WriteString(fmt.Sprintf("\n%*s", indent, " "))
 			}
+			indent += len(v.Type().Field(i).Name) + 3 // '(' + ' '
+
 			fmt.Fprintf(buf, "(%s ", v.Type().Field(i).Name)
-			if err := encode(buf, v.Field(i)); err != nil {
+			if err := encode(buf, v.Field(i), indent); err != nil {
 				return err
 			}
 			buf.WriteByte(')')
+
+			indent -= len(v.Type().Field(i).Name) + 3
 		}
 		buf.WriteByte(')')
 
@@ -88,14 +94,16 @@ func encode(buf *bytes.Buffer, v reflect.Value) error {
 		buf.WriteByte('(')
 		for i, key := range v.MapKeys() {
 			if i > 0 {
-				buf.WriteByte(' ')
+				buf.WriteString(fmt.Sprintf("\n%*s", indent, " "))
+			} else {
+				indent += 1
 			}
 			buf.WriteByte('(')
-			if err := encode(buf, key); err != nil {
+			if err := encode(buf, key, indent); err != nil {
 				return err
 			}
 			buf.WriteByte(' ')
-			if err := encode(buf, v.MapIndex(key)); err != nil {
+			if err := encode(buf, v.MapIndex(key), indent); err != nil {
 				return err
 			}
 			buf.WriteByte(')')
@@ -109,7 +117,7 @@ func encode(buf *bytes.Buffer, v reflect.Value) error {
 		}
 
 		fmt.Fprintf(buf, "(\"%s\" ", v.Elem().Type())
-		encode(buf, v.Elem())
+		encode(buf, v.Elem(), indent)
 		buf.WriteByte(')')
 
 	default: // chan, func, interface
