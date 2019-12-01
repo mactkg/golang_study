@@ -16,24 +16,67 @@ import (
 	"text/scanner"
 )
 
+// low level API
+type Token interface{}
+type Symbol string
+type String string
+type Int int
+type StartList struct{}
+type EndList struct{}
+
+func (s Symbol) String() string {
+	return string(s)
+}
+func (s String) String() string {
+	return string(s)
+}
+func (s Int) String() string {
+	return strconv.FormatInt(int64(s), 10)
+}
+
+// Token() returns next Token
+func (dec *Decoder) Token() (Token, error) {
+	dec.lex.next()
+	switch dec.lex.token {
+	case scanner.EOF:
+		return nil, io.EOF
+	case scanner.Ident:
+		return Symbol(dec.lex.text()), nil
+	case scanner.String:
+		s, _ := strconv.Unquote(dec.lex.text())
+		return String(s), nil
+	case scanner.Int:
+		i, _ := strconv.ParseInt(dec.lex.text(), 10, 64)
+		return Int(i), nil
+	case '(':
+		return StartList{}, nil
+	case ')':
+		return EndList{}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected token %q", dec.lex.text())
+}
+
+// Stream API to decode
 type Decoder struct {
 	reader io.Reader
+	lex    lexer
 }
 
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{reader: r}
+	lex := lexer{scan: scanner.Scanner{Mode: scanner.GoTokens}}
+	lex.scan.Init(r)
+	return &Decoder{reader: r, lex: lex}
 }
 
 func (dec *Decoder) Decode(v interface{}) (err error) {
-	lex := &lexer{scan: scanner.Scanner{Mode: scanner.GoTokens}}
-	lex.scan.Init(dec.reader)
-	lex.next()
+	dec.lex.next()
 	defer func() {
 		if x := recover(); x != nil {
-			err = fmt.Errorf("error at %s: %v", lex.scan.Position, x)
+			err = fmt.Errorf("error at %s: %v", dec.lex.scan.Position, x)
 		}
 	}()
-	read(lex, reflect.ValueOf(v).Elem())
+	read(&dec.lex, reflect.ValueOf(v).Elem())
 	return nil
 }
 
