@@ -38,12 +38,15 @@ func Test(t *testing.T) {
 	}
 
 	// Encode it
-	buf := &bytes.Buffer{}
-	encoder := NewEncoder(buf)
-	encoder.Encode(strangelove)
-	t.Logf("Marshal() = %s\n", buf)
+	data, err := Marshal(strangelove)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+	t.Logf("Marshal() = %s\n", data)
 
-	decoder := NewDecoder(buf)
+	buffer := bytes.NewBuffer(data)
+	decoder := NewDecoder(buffer)
+
 	var movie Movie
 	if err := decoder.Decode(&movie); err != nil {
 		t.Fatalf("Decode failed: %v", err)
