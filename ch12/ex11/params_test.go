@@ -8,9 +8,9 @@ import (
 
 func TestParams(t *testing.T) {
 	type Test struct {
-		Num      int
+		Num      int `http:"nyamu"` // tag test
 		Str      string
-		Bl       bool
+		Bl       bool `http:"💡"` // tag test 2
 		NumArray []int
 	}
 
@@ -19,6 +19,7 @@ func TestParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Log(str)
 
 	unpacked := Test{}
 	req := httptest.NewRequest("GET", str, nil)
