@@ -5,7 +5,6 @@ package sexpr
 
 import (
 	"bytes"
-	"io"
 	"reflect"
 	"testing"
 )
@@ -57,61 +56,37 @@ func Test(t *testing.T) {
 	}
 }
 
-func TestConsume(t *testing.T) {
-	type Tester struct {
-		Id   int
-		Name string
-		Attr map[string]string
+func TestEx12_10(t *testing.T) {
+	type Test struct {
+		F32 float32
+		F64 float64
+		T   bool
+		F   bool
+		I   interface{}
 	}
-	data := Tester{
-		Id:   88,
-		Name: "hello",
-		Attr: map[string]string{
-			"age":   "10",
-			"state": "Tokyo",
-		},
+	d := Test{
+		F32: 123.456, // I want to test negative value, but I can't impl that
+		F64: 123.456,
+		T:   true,
+		F:   false,
+		I:   []int{1, 2, 4, 8},
 	}
 
-	// encode Test data to decode
-	buf := &bytes.Buffer{}
-	encoder := NewEncoder(buf)
-	err := encoder.Encode(data)
+	RegisterInterface("[]int", reflect.TypeOf([]int{}))
+
+	res, err := Marshal(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(string(res))
+
+	out := Test{}
+	err = Unmarshal(res, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// pass encoded data to decoder, and restructure it
-	decoder := NewDecoder(buf)
-	str := ""
-	for {
-		token, err := decoder.Token()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			t.Fatal(err)
-		}
-
-		switch token := token.(type) {
-		case String:
-			str += `"` + token.String() + `"`
-		case Int:
-			str += token.String()
-		case Symbol:
-			str += token.String() + " "
-		case StartList:
-			str += "("
-		case EndList:
-			str += ")"
-		}
-	}
-
-	// Pass restructured data to Unmarshal(), and compare them deeply
-	tester := Tester{}
-	err = Unmarshal([]byte(str), &tester)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(tester, data) {
-		t.Fatalf("%v != %v", tester, data)
+	if !reflect.DeepEqual(d, out) {
+		t.Fatalf("%v != %v", d, out)
 	}
 }

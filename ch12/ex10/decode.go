@@ -13,8 +13,24 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"text/scanner"
 )
+
+var Interfaces map[string]reflect.Type
+
+func init() {
+	Interfaces = make(map[string]reflect.Type)
+}
+
+func RegisterInterface(name string, i reflect.Type) {
+	Interfaces[name] = i
+}
+
+func checkInterfaceSupport(name string) (ok bool) {
+	_, ok = Interfaces[name]
+	return
+}
 
 // low level API
 type Token interface{}
@@ -173,6 +189,10 @@ func read(lex *lexer, v reflect.Value) {
 		readList(lex, v)
 		lex.next() // consume ')'
 		return
+	case '-': // TODO: support negative value
+		lex.next()
+		read(lex, v)
+		return
 	}
 	panic(fmt.Sprintf("unexpected token %q", lex.text()))
 }
@@ -217,6 +237,16 @@ func readList(lex *lexer, v reflect.Value) {
 			v.SetMapIndex(key, value)
 			lex.consume(')')
 		}
+
+	case reflect.Interface:
+		t, ok := Interfaces[strings.Trim(lex.text(), `"`)]
+		if !ok {
+			panic(fmt.Sprintf("Not supported type: %v", lex.text()))
+		}
+		d := reflect.Indirect(reflect.New(t))
+		lex.next()
+		read(lex, d)
+		v.Set(d)
 
 	default:
 		panic(fmt.Sprintf("cannot decode list into %v", v.Type()))
