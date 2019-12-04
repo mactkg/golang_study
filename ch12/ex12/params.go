@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -53,7 +54,16 @@ func Pack(url string, val interface{}) (string, error) {
 	return url + paramStr, nil
 }
 
+func validate(v string, matcher *regexp.Regexp) bool {
+	return matcher.MatchString(v)
+}
+
 //!+Unpack
+
+type field struct {
+	v reflect.Value
+	m *regexp.Regexp
+}
 
 // Unpack populates the fields of the struct pointed to by ptr
 // from the HTTP request parameters in req.
@@ -63,7 +73,7 @@ func Unpack(req *http.Request, ptr interface{}) error {
 	}
 
 	// Build map of fields keyed by effective name.
-	fields := make(map[string]reflect.Value)
+	fields := make(map[string]field)
 	v := reflect.ValueOf(ptr).Elem() // the struct variable
 	for i := 0; i < v.NumField(); i++ {
 		fieldInfo := v.Type().Field(i) // a reflect.StructField
@@ -72,24 +82,35 @@ func Unpack(req *http.Request, ptr interface{}) error {
 		if name == "" {
 			name = strings.ToLower(fieldInfo.Name)
 		}
-		fields[name] = v.Field(i)
+
+		// validation
+		pattern := tag.Get("validation")
+		matcher := regexp.MustCompile(pattern)
+
+		fields[name] = field{v.Field(i), matcher}
 	}
 
 	// Update struct field for each parameter in the request.
 	for name, values := range req.Form {
 		f := fields[name]
-		if !f.IsValid() {
+		if !f.v.IsValid() {
 			continue // ignore unrecognized HTTP parameters
 		}
 		for _, value := range values {
-			if f.Kind() == reflect.Slice {
-				elem := reflect.New(f.Type().Elem()).Elem()
+			if f.v.Kind() == reflect.Slice {
+				elem := reflect.New(f.v.Type().Elem()).Elem()
+				if f.m != nil && !f.m.MatchString(value) {
+					return fmt.Errorf("validate error: %v", value)
+				}
 				if err := populate(elem, value); err != nil {
 					return fmt.Errorf("%s: %v", name, err)
 				}
-				f.Set(reflect.Append(f, elem))
+				f.v.Set(reflect.Append(f.v, elem))
 			} else {
-				if err := populate(f, value); err != nil {
+				if f.m != nil && !f.m.MatchString(value) {
+					return fmt.Errorf("validate error: %v", value)
+				}
+				if err := populate(f.v, value); err != nil {
 					return fmt.Errorf("%s: %v", name, err)
 				}
 			}
