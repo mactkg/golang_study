@@ -14,6 +14,45 @@ import (
 	"strings"
 )
 
+func Pack(url string, val interface{}) (string, error) {
+	paramStr := ""
+
+	ref := reflect.ValueOf(val)
+	for i := 0; i < ref.NumField(); i++ {
+		if i == 0 {
+			paramStr += "?"
+		} else {
+			paramStr += "&"
+		}
+
+		// build name for param
+		fieldInfo := ref.Type().Field(i)
+		tag := fieldInfo.Tag
+		name := tag.Get("http")
+		if name == "" {
+			name = strings.ToLower(fieldInfo.Name)
+		}
+
+		v := ref.Field(i)
+		switch v.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			for a := 0; a < v.Len(); a++ {
+				if a != 0 {
+					paramStr += "&"
+				}
+				paramStr += fmt.Sprintf("%s=%v", name, v.Index(a))
+			}
+		case reflect.Int, reflect.Bool, reflect.String:
+			paramStr += fmt.Sprintf("%s=%v", name, v)
+
+		default:
+			return "", fmt.Errorf("unsupported kind %s", v.Type())
+		}
+	}
+
+	return url + paramStr, nil
+}
+
 //!+Unpack
 
 // Unpack populates the fields of the struct pointed to by ptr
