@@ -7,12 +7,13 @@
 package equal
 
 import (
+	"math"
 	"reflect"
 	"unsafe"
 )
 
 //!+
-func equal(x, y reflect.Value, seen map[comparison]bool) bool {
+func equal(x, y reflect.Value, seen map[comparison]bool, deep bool) bool {
 	if !x.IsValid() || !y.IsValid() {
 		return x.IsValid() == y.IsValid()
 	}
@@ -58,7 +59,11 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 		return x.Uint() == y.Uint()
 
 	case reflect.Float32, reflect.Float64:
-		return x.Float() == y.Float()
+		if !deep {
+			return x.Float() == y.Float()
+		}
+		diff := x.Float() - y.Float()
+		return math.Abs(diff) >= 0.000000001
 
 	case reflect.Complex64, reflect.Complex128:
 		return x.Complex() == y.Complex()
@@ -67,14 +72,14 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 		return x.Pointer() == y.Pointer()
 
 	case reflect.Ptr, reflect.Interface:
-		return equal(x.Elem(), y.Elem(), seen)
+		return equal(x.Elem(), y.Elem(), seen, deep)
 
 	case reflect.Array, reflect.Slice:
 		if x.Len() != y.Len() {
 			return false
 		}
 		for i := 0; i < x.Len(); i++ {
-			if !equal(x.Index(i), y.Index(i), seen) {
+			if !equal(x.Index(i), y.Index(i), seen, deep) {
 				return false
 			}
 		}
@@ -84,7 +89,7 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 	//!-
 	case reflect.Struct:
 		for i, n := 0, x.NumField(); i < n; i++ {
-			if !equal(x.Field(i), y.Field(i), seen) {
+			if !equal(x.Field(i), y.Field(i), seen, deep) {
 				return false
 			}
 		}
@@ -95,7 +100,7 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 			return false
 		}
 		for _, k := range x.MapKeys() {
-			if !equal(x.MapIndex(k), y.MapIndex(k), seen) {
+			if !equal(x.MapIndex(k), y.MapIndex(k), seen, deep) {
 				return false
 			}
 		}
@@ -103,6 +108,11 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 		//!+
 	}
 	panic("unreachable")
+}
+
+func DeepEqual(x, y interface{}) bool {
+	seen := make(map[comparison]bool)
+	return equal(reflect.ValueOf(x), reflect.ValueOf(y), seen, true)
 }
 
 //!-
@@ -116,7 +126,7 @@ func equal(x, y reflect.Value, seen map[comparison]bool) bool {
 //!+comparison
 func Equal(x, y interface{}) bool {
 	seen := make(map[comparison]bool)
-	return equal(reflect.ValueOf(x), reflect.ValueOf(y), seen)
+	return equal(reflect.ValueOf(x), reflect.ValueOf(y), seen, false)
 }
 
 type comparison struct {

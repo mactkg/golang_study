@@ -131,3 +131,39 @@ func Example_equalCycle() {
 	// false
 	// false
 }
+
+func TestDeepEqual(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		inputA   float64
+		inputB   float64
+		expected bool
+	}{
+		{
+			desc:     "false",
+			inputA:   0.0000000001,
+			inputB:   0.0000000002,
+			expected: false,
+		},
+		{
+			desc:     "edge",
+			inputA:   0.0000000010,
+			inputB:   0.0000000019999999999999999,
+			expected: false,
+		},
+		{
+			desc:     "true",
+			inputA:   0.00000001,
+			inputB:   0.00000002,
+			expected: true,
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			res := DeepEqual(tC.inputA, tC.inputB)
+			if res != tC.expected {
+				t.Fatalf("DeepEqual(%e, %e) got %v, expected %v(diff: %e)", tC.inputA, tC.inputB, res, tC.expected, tC.inputA-tC.inputB)
+			}
+		})
+	}
+}
