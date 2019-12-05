@@ -58,11 +58,11 @@ func Test(t *testing.T) {
 
 func TestEx12_10(t *testing.T) {
 	type Test struct {
-		F32 float32
-		F64 float64
-		T   bool
-		F   bool
-		I   interface{}
+		F32 float32     `sexpr:"float32"`
+		F64 float64     `sexpr:"float64"`
+		T   bool        `sexpr:"true"`
+		F   bool        `sexpr:"false"`
+		I   interface{} `sexpr:"interface"`
 	}
 	d := Test{
 		F32: 123.456, // I want to test negative value, but I can't impl that

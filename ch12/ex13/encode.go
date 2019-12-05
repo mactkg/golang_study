@@ -96,18 +96,24 @@ func encode(buf io.Writer, v reflect.Value, indent int) error {
 				continue
 			}
 
+			fieldInfo := v.Type().Field(i)
+			name := fieldInfo.Tag.Get("sexpr")
+			if name == "" {
+				name = fieldInfo.Name
+			}
+
 			if i > 0 {
 				fmt.Fprintf(buf, "\n%*s", indent, " ")
 			}
-			indent += len(v.Type().Field(i).Name) + 3 // '(' + ' '
+			indent += len(name) + 3 // '(' + ' '
 
-			fmt.Fprintf(buf, "(%s ", v.Type().Field(i).Name)
+			fmt.Fprintf(buf, "(%s ", name)
 			if err := encode(buf, v.Field(i), indent); err != nil {
 				return err
 			}
 			buf.Write([]byte{')'})
 
-			indent -= len(v.Type().Field(i).Name) + 3
+			indent -= len(name) + 3
 		}
 		buf.Write([]byte{')'})
 

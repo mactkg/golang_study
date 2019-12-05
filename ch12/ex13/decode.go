@@ -222,7 +222,7 @@ func readList(lex *lexer, v reflect.Value) {
 			}
 			name := lex.text()
 			lex.next()
-			read(lex, v.FieldByName(name))
+			read(lex, fieldByName(v, name))
 			lex.consume(')')
 		}
 
@@ -261,6 +261,27 @@ func endList(lex *lexer) bool {
 		return true
 	}
 	return false
+}
+
+func fieldByName(v reflect.Value, name string) reflect.Value {
+	if v.Kind() != reflect.Struct {
+		panic("fieldByName: not supported type")
+	}
+
+	res := v.FieldByName(name)
+	if res.Kind() != reflect.Invalid {
+		return res
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		fieldInfo := v.Type().Field(i)
+		customName := fieldInfo.Tag.Get("sexpr")
+		if customName == name {
+			return v.Field(i)
+		}
+	}
+
+	return reflect.Value{}
 }
 
 //!-readlist
